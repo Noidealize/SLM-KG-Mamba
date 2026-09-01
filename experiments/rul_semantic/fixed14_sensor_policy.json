@@ -1,0 +1,14 @@
+{
+  "policy_id": "cmapss_fixed14_v1",
+  "status": "frozen",
+  "frozen_on": "2026-09-02",
+  "decision_owner": "Noidealize",
+  "subsets": ["FD001", "FD002", "FD003", "FD004"],
+  "sensor_columns": ["s2", "s3", "s4", "s7", "s8", "s9", "s11", "s12", "s13", "s14", "s15", "s17", "s20", "s21"],
+  "sensor_count": 14,
+  "order_is_model_input_contract": true,
+  "allow_subset_specific_sensor_removal": false,
+  "allow_runtime_variance_filtering": false,
+  "rationale": "Preserve one input dimension and order across FD001-FD004 and remain compatible with the audited external predictor. Subset-specific constants are documented but do not alter the model input contract.",
+  "known_limitation": "The fixed set is a controlled comparison policy, not a claim that the same sensors are non-constant in every subset."
+}

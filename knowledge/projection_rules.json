@@ -1,0 +1,11 @@
+{
+  "projection_version": "sensor_multihop_shared_entity_v2_draft",
+  "node_order_source": "explicit predictor sensor list",
+  "accepted_review_statuses": ["accepted", "unverified", "needs_review"],
+  "shared_neighbor_weight": 1.0,
+  "max_hops_from_sensor": 2,
+  "self_loop_weight": 1.0,
+  "symmetrize": true,
+  "range": [0.0, 1.0],
+  "warning": "Prototype projection only; including unreviewed edges is allowed solely for feasibility validation."
+}

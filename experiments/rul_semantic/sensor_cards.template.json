@@ -11,7 +11,6 @@
   {"sensor_column": "s14", "text": "NRc: corrected core speed. Describes core rotor speed adjusted for operating conditions."},
   {"sensor_column": "s15", "text": "BPR: bypass ratio. Describes flow division between bypass duct and engine core."},
   {"sensor_column": "s17", "text": "htBleed: bleed enthalpy associated with high-pressure compressor bleed flow."},
-  {"sensor_column": "s20", "text": "W21: high-pressure turbine coolant bleed flow. Associated with HPT thermal management."},
+  {"sensor_column": "s20", "text": "W31: high-pressure turbine coolant bleed flow. Associated with HPT thermal management."},
   {"sensor_column": "s21", "text": "W32: low-pressure turbine coolant bleed flow. Associated with LPT thermal management."}
 ]
-

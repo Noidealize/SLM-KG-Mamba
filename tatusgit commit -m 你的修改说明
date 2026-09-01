@@ -1,0 +1,302 @@
+warning: in the working copy of 'experiments/rul_semantic/README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'experiments/rul_semantic/prepare_slm_semantics.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'experiments/rul_semantic/semantic_backbone.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'experiments/rul_semantic/sensor_cards.template.json', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'experiments/rul_semantic/tests/test_semantic_backbone.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'experiments/rul_semantic/train_semantic.py', LF will be replaced by CRLF the next time Git touches it
+[1mdiff --git a/experiments/rul_semantic/README.md b/experiments/rul_semantic/README.md[m
+[1mindex 848bf65..de00e6e 100644[m
+[1m--- a/experiments/rul_semantic/README.md[m
+[1m+++ b/experiments/rul_semantic/README.md[m
+[36m@@ -1,32 +1,48 @@[m
+[31m-# MA-RDG-Mamba Semantic Refactor[m
+[32m+[m[32m# RUL semantic and graph feasibility layer[m
+ [m
+[31m-This directory is an additive refactor of `MA_RDG_Mamba_RUL_complete_v1`.[m
+[31m-It does not overwrite the original training scripts or results.[m
+[32m+[m[32mStatus: diagnostic feasibility only. Outputs are not paper evidence and the safe[m
+[32m+[m[32mloader never opens official C-MAPSS test or RUL files.[m
+ [m
+ The refactor separates two independent random processes:[m
+ [m
+ - `model_seed`: model initialization and data-loader order;[m
+ - `kg_seed`: TransE knowledge-backbone construction, fixed across model seeds.[m
+ [m
+[31m-It also makes the 20% semantic component of the mechanism backbone replaceable:[m
+[32m+[m[32mThe semantic names are:[m
+ [m
+ - `transe`: original TransE cosine similarity;[m
+ - `slm`: cached pretrained-SLM sensor embeddings;[m
+ - `slm_shuffled`: cached SLM embeddings with a deterministic sensor permutation;[m
+[31m-- `none`: no semantic component, with direct/path weights renormalized.[m
+[32m+[m[32m- `none` / `no_semantic`: exact-zero semantic component, with other weights renormalized.[m
+[32m+[m[32m- explicit aliases: `semantic_similarity_slm` and `semantic_similarity_shuffled`.[m
+ [m
+[31m-The direct topology and path components remain unchanged. SLM inference is[m
+[31m-offline, so the RUL model has no language-model cost during training or[m
+[31m-deployment.[m
+[32m+[m[32mThe SLM path embeds manually authored sensor cards. It is not full SLM[m
+[32m+[m[32mentity/relation/evidence extraction. Cache loading fails closed on metadata,[m
+[32m+[m[32msensor order, dimensions, NaN/Inf, zero norms, and semantic-matrix SHA256.[m
+ [m
+ ## Layout[m
+ [m
+ - `semantic_backbone.py`: audited backbone construction and cache validation.[m
+ - `prepare_slm_semantics.py`: offline frozen-SLM embedding generator.[m
+[31m-- `experiment.py`: protocol/configuration helpers for the original trainer.[m
+[32m+[m[32m- `graph_paths.py`: explicit F0 bypass, F1 data graph, F2 Reference KG, and F3 fixed fusion.[m
+[32m+[m[32m- `predictor_adapter.py`: local external-model adapter without modifying the dependency.[m
+[32m+[m[32m- `data_protocol.py`: engine-level train/validation loader that never opens official test.[m
+ - `tests/`: CPU-only invariant tests.[m
+ [m
+[31m-This first refactor intentionally does not duplicate the CUDA Mamba model. The[m
+[31m-existing `MARDGMamba` remains the numerical predictor; the refactor produces a[m
+[31m-drop-in `a_k` matrix for it.[m
+[31m-[m
+[32m+[m[32mOutput paths include subset, semantic mode, graph path, model seed, KG seed, and[m
+[32m+[m[32mconfiguration hash. Protocols declare `diagnostic_feasibility_only`,[m
+[32m+[m[32m`paper_evidence=false`, and `official_test_used=false`.[m
+[32m+[m
+[32m+[m[32m## Frozen experiment inputs[m
+[32m+[m
+[32m+[m[32m- `fixed14_sensor_policy.json` freezes one ordered 14-sensor input contract for[m
+[32m+[m[32m  FD001-FD004; runtime or subset-specific sensor removal is forbidden.[m
+[32m+[m[32m- `formal_experiment_protocol.json` freezes F0-F3 comparisons, matched seeds,[m
+[32m+[m[32m  stage gates, metrics, and reviewed-KG artifact hashes.[m
+[32m+[m[32m- `validate_formal_protocol.py` checks the frozen artifacts and all four training[m
+[32m+[m[32m  files without resolving or opening official test/RUL files.[m
+[32m+[m[32m- `run_protocol.py` executes the frozen matched-seed pilot/confirmatory matrix,[m
+[32m+[m[32m  skips only hash-compatible completed runs, stops on the first failure, and writes[m
+[32m+[m[32m  one UTF-8 log per subset/path/seed under `<output-root>/logs/`.[m
+[32m+[m[32m- `summarize_pilot.py` audits Pilot completeness and exports validation results;[m
+[32m+[m[32m  missing jobs remain explicit and are not silently dropped.[m
+[1mdiff --git a/experiments/rul_semantic/prepare_slm_semantics.py b/experiments/rul_semantic/prepare_slm_semantics.py[m
+[1mindex a8e6ff6..8f824d7 100644[m
+[1m--- a/experiments/rul_semantic/prepare_slm_semantics.py[m
+[1m+++ b/experiments/rul_semantic/prepare_slm_semantics.py[m
+[36m@@ -5,9 +5,11 @@[m [mimport argparse[m
+ import hashlib[m
+ import json[m
+ from pathlib import Path[m
+[32m+[m[32mfrom datetime import datetime, timezone[m
+ [m
+ import numpy as np[m
+ import torch[m
+[32m+[m[32mimport transformers[m
+ from transformers import AutoModel, AutoTokenizer[m
+ [m
+ [m
+[36m@@ -36,7 +38,8 @@[m [mdef load_cards(path: Path) -> tuple[list[str], list[str]]:[m
+ [m
+ [m
+ @torch.inference_mode()[m
+[31m-def encode(model_path: Path, texts: list[str], device: str, max_length: int) -> np.ndarray:[m
+[32m+[m[32mdef encode(model_path: Path, texts: list[str], device: str, max_length: int,[m
+[32m+[m[32m           pooling: str) -> tuple[np.ndarray, object, object]:[m
+     tokenizer = AutoTokenizer.from_pretrained(model_path, local_files_only=True)[m
+     model = AutoModel.from_pretrained(model_path, local_files_only=True).to(device).eval()[m
+     rows = [][m
+[36m@@ -45,9 +48,35 @@[m [mdef encode(model_path: Path, texts: list[str], device: str, max_length: int) ->[m
+         inputs = {key: value.to(device) for key, value in inputs.items()}[m
+         hidden = model(**inputs).last_hidden_state[m
+         mask = inputs["attention_mask"].unsqueeze(-1).to(hidden.dtype)[m
+[31m-        pooled = (hidden * mask).sum(1) / mask.sum(1).clamp_min(1)[m
+[32m+[m[32m        if pooling == "mean":[m
+[32m+[m[32m            pooled = (hidden * mask).sum(1) / mask.sum(1).clamp_min(1)[m
+[32m+[m[32m        elif pooling == "last_valid_token":[m
+[32m+[m[32m            index = inputs["attention_mask"].sum(1) - 1[m
+[32m+[m[32m            pooled = hidden[torch.arange(hidden.shape[0], device=hidden.device), index][m
+[32m+[m[32m        else:[m
+[32m+[m[32m            raise ValueError(f"unsupported pooling: {pooling}")[m
+         rows.append(pooled[0].float().cpu().numpy())[m
+[31m-    return np.stack(rows).astype(np.float32)[m
+[32m+[m[32m    return np.stack(rows).astype(np.float32), tokenizer, model.config[m
+[32m+[m
+[32m+[m
+[32m+[m[32mdef _array_hash(value: np.ndarray) -> str:[m
+[32m+[m[32m    value = np.ascontiguousarray(value)[m
+[32m+[m[32m    digest = hashlib.sha256()[m
+[32m+[m[32m    digest.update(str(value.dtype).encode())[m
+[32m+[m[32m    digest.update(str(value.shape).encode())[m
+[32m+[m[32m    digest.update(value.tobytes())[m
+[32m+[m[32m    return digest.hexdigest()[m
+[32m+[m
+[32m+[m
+[32m+[m[32mdef _cosine_matrix(embeddings: np.ndarray) -> np.ndarray:[m
+[32m+[m[32m    if not np.all(np.isfinite(embeddings)):[m
+[32m+[m[32m        raise ValueError("embeddings contain NaN or Inf")[m
+[32m+[m[32m    norms = np.linalg.norm(embeddings, axis=1, keepdims=True)[m
+[32m+[m[32m    if np.any(norms <= 1e-12):[m
+[32m+[m[32m        raise ValueError("embeddings contain a zero-norm row")[m
+[32m+[m[32m    matrix = ((embeddings / norms) @ (embeddings / norms).T + 1.0) / 2.0[m
+[32m+[m[32m    np.fill_diagonal(matrix, 1.0)[m
+[32m+[m[32m    return matrix.astype(np.float32)[m
+ [m
+ [m
+ def main() -> None:[m
+[36m@@ -57,16 +86,28 @@[m [mdef main() -> None:[m
+     parser.add_argument("--output", type=Path, required=True)[m
+     parser.add_argument("--device", default="cuda")[m
+     parser.add_argument("--max-length", type=int, default=256)[m
+[32m+[m[32m    parser.add_argument("--pooling", choices=["mean", "last_valid_token"], default="mean")[m
+     args = parser.parse_args()[m
+     sensors, texts = load_cards(args.sensor_cards)[m
+[31m-    embeddings = encode(args.model_path, texts, args.device, args.max_length)[m
+[32m+[m[32m    embeddings, tokenizer, model_config = encode([m
+[32m+[m[32m        args.model_path, texts, args.device, args.max_length, args.pooling[m
+[32m+[m[32m    )[m
+[32m+[m[32m    config_json = model_config.to_json_string().encode("utf-8")[m
+[32m+[m[32m    weights_id = getattr(model_config, "_name_or_path", None) or str(args.model_path.resolve())[m
+     metadata = {[m
+[32m+[m[32m        "model_name": getattr(model_config, "model_type", args.model_path.name),[m
+         "model_path": str(args.model_path.resolve()),[m
+[32m+[m[32m        "model_config_sha256": hashlib.sha256(config_json).hexdigest(),[m
+[32m+[m[32m        "weights_id": str(weights_id),[m
+[32m+[m[32m        "tokenizer_id": str(getattr(tokenizer, "name_or_path", args.model_path.resolve())),[m
+[32m+[m[32m        "transformers_version": transformers.__version__,[m
+         "sensor_cards": str(args.sensor_cards.resolve()),[m
+         "sensor_cards_sha256": _file_hash(args.sensor_cards),[m
+[31m-        "pooling": "attention-mask mean of last_hidden_state",[m
+[32m+[m[32m        "pooling": args.pooling,[m
+         "max_length": args.max_length,[m
+         "embedding_dim": int(embeddings.shape[1]),[m
+[32m+[m[32m        "generated_at_utc": datetime.now(timezone.utc).isoformat(),[m
+[32m+[m[32m        "semantic_matrix_sha256": _array_hash(_cosine_matrix(embeddings)),[m
+     }[m
+     args.output.parent.mkdir(parents=True, exist_ok=True)[m
+     np.savez_compressed([m
+[36m@@ -80,4 +121,3 @@[m [mdef main() -> None:[m
+ [m
+ if __name__ == "__main__":[m
+     main()[m
+[31m-[m
+[1mdiff --git a/experiments/rul_semantic/semantic_backbone.py b/experiments/rul_semantic/semantic_backbone.py[m
+[1mindex be27872..9fcf5a0 100644[m
+[1m--- a/experiments/rul_semantic/semantic_backbone.py[m
+[1m+++ b/experiments/rul_semantic/semantic_backbone.py[m
+[36m@@ -13,7 +13,17 @@[m [mimport numpy as np[m
+ import torch[m
+ [m
+ [m
+[31m-SemanticMode = Literal["transe", "slm", "slm_shuffled", "none"][m
+[32m+[m[32mSemanticMode = Literal[[m
+[32m+[m[32m    "transe", "slm", "slm_shuffled", "none",[m
+[32m+[m[32m    "semantic_similarity_slm", "semantic_similarity_shuffled", "no_semantic",[m
+[32m+[m[32m    "reference_kg_projected", "no_kg",[m
+[32m+[m[32m][m
+[32m+[m
+[32m+[m[32mMODE_ALIASES = {[m
+[32m+[m[32m    "semantic_similarity_slm": "slm",[m
+[32m+[m[32m    "semantic_similarity_shuffled": "slm_shuffled",[m
+[32m+[m[32m    "no_semantic": "none",[m
+[32m+[m[32m}[m
+ [m
+ [m
+ @dataclass(frozen=True)[m
+[36m@@ -25,6 +35,7 @@[m [mclass BackboneSpec:[m
+     semantic_weight: float = 0.20[m
+     slm_cache: Path | None = None[m
+     shuffle_seed: int = 1042[m
+[32m+[m[32m    reference_kg_matrix: Path | None = None[m
+ [m
+ [m
+ @dataclass(frozen=True)[m
+[36m@@ -77,6 +88,25 @@[m [mdef load_slm_cache(path: Path, expected_sensors: list[str]) -> tuple[np.ndarray,[m
+         )[m
+     if embeddings.shape[0] != len(expected_sensors):[m
+         raise ValueError("SLM cache row count does not match sensor count")[m
+[32m+[m[32m    if not np.all(np.isfinite(embeddings)):[m
+[32m+[m[32m        raise ValueError("SLM cache embeddings contain NaN or Inf")[m
+[32m+[m[32m    if np.any(np.linalg.norm(embeddings, axis=1) <= 1e-12):[m
+[32m+[m[32m        raise ValueError("SLM cache embeddings contain a zero-norm row")[m
+[32m+[m[32m    required_metadata = {[m
+[32m+[m[32m        "model_name", "model_config_sha256", "weights_id", "tokenizer_id",[m
+[32m+[m[32m        "transformers_version", "pooling", "sensor_cards_sha256",[m
+[32m+[m[32m        "generated_at_utc", "embedding_dim", "semantic_matrix_sha256",[m
+[32m+[m[32m    }[m
+[32m+[m[32m    missing_metadata = required_metadata.difference(metadata)[m
+[32m+[m[32m    if missing_metadata:[m
+[32m+[m[32m        raise ValueError(f"SLM cache metadata missing keys: {sorted(missing_metadata)}")[m
+[32m+[m[32m    if int(metadata["embedding_dim"]) != embeddings.shape[1]:[m
+[32m+[m[32m        raise ValueError("SLM cache embedding_dim metadata does not match embeddings")[m
+[32m+[m[32m    if metadata["pooling"] not in {"mean", "last_valid_token"}:[m
+[32m+[m[32m        raise ValueError("SLM cache pooling must be mean or last_valid_token")[m
+[32m+[m[32m    expected_sha = _sha256_array(_cosine_similarity(embeddings))[m
+[32m+[m[32m    if metadata["semantic_matrix_sha256"] != expected_sha:[m
+[32m+[m[32m        raise ValueError("SLM cache semantic matrix hash mismatch")[m
+     return embeddings, metadata[m
+ [m
+ [m
+[36m@@ -92,6 +122,38 @@[m [mdef _import_original(original_root: Path):[m
+     return config, build_mechanism_backbone[m
+ [m
+ [m
+[32m+[m[32mdef _call_builder_preserving_rng(builder, sensor_columns: list[str], kg_seed: int):[m
+[32m+[m[32m    python_state = random.getstate()[m
+[32m+[m[32m    numpy_state = np.random.get_state()[m
+[32m+[m[32m    torch_state = torch.random.get_rng_state()[m
+[32m+[m[32m    try:[m
+[32m+[m[32m        random.seed(kg_seed); np.random.seed(kg_seed); torch.manual_seed(kg_seed)[m
+[32m+[m[32m        return builder(sensor_columns, kg_seed)[m
+[32m+[m[32m    finally:[m
+[32m+[m[32m        random.setstate(python_state)[m
+[32m+[m[32m        np.random.set_state(numpy_state)[m
+[32m+[m[32m        torch.random.set_rng_state(torch_state)[m
+[32m+[m
+[32m+[m
+[32m+[m[32mdef load_projected_kg(path: Path, sensor_count: int) -> np.ndarray:[m
+[32m+[m[32m    path = Path(path)[m
+[32m+[m[32m    if not path.is_file():[m
+[32m+[m[32m        raise FileNotFoundError(f"projected KG not found: {path}")[m
+[32m+[m[32m    if path.suffix == ".npy":[m
+[32m+[m[32m        matrix = np.load(path, allow_pickle=False)[m
+[32m+[m[32m    else:[m
+[32m+[m[32m        with np.load(path, allow_pickle=False) as payload:[m
+[32m+[m[32m            if "matrix" not in payload.files:[m
+[32m+[m[32m                raise ValueError("projected KG archive must contain 'matrix'")[m
+[32m+[m[32m            matrix = payload["matrix"][m
+[32m+[m[32m    matrix = np.asarray(matrix, dtype=np.float32)[m
+[32m+[m[32m    if matrix.shape != (sensor_count, sensor_count):[m
+[32m+[m[32m        raise ValueError(f"projected KG shape mismatch: {matrix.shape}")[m
+[32m+[m[32m    if not np.all(np.isfinite(matrix)) or np.any(matrix < 0) or np.any(matrix > 1):[m
+[32m+[m[32m        raise ValueError("projected KG must be finite and within [0,1]")[m
+[32m+[m[32m    return matrix[m
+[32m+[m
+[32m+[m
+ def build_backbone([m
+     original_root: Path,[m
+     sensor_columns: list[str],[m
+[36m@@ -103,19 +165,11 @@[m [mdef build_backbone([m
+     NumPy and Torch RNG states are restored afterwards, so knowledge creation[m
+     cannot perturb model initialization or data-loader randomness.[m
+     """[m
+[32m+[m[32m    mode = MODE_ALIASES.get(spec.mode, spec.mode)[m
+     config, original_builder = _import_original(original_root)[m
+[31m-    python_state = random.getstate()[m
+[31m-    numpy_state = np.random.get_state()[m
+[31m-    torch_state = torch.random.get_rng_state()[m
+[31m-    try:[m
+[31m-        random.seed(spec.kg_seed)[m
+[31m-        np.random.seed(spec.kg_seed)[m
+[31m-        torch.manual_seed(spec.kg_seed)[m
+[31m-        _, original_parts = original_builder(sensor_columns, spec.kg_seed)[m
+[31m-    finally:[m
+[31m-        random.setstate(python_state)[m
+[31m-        np.random.set_state(numpy_state)[m
+[31m-        torch.random.set_rng_state(torch_state)[m
+[32m+[m[32m    _, original_parts = _call_builder_preserving_rng([m
+[32m+[m[32m        original_builder, sensor_columns, spec.kg_seed[m
+[32m+[m[32m    )[m
+ [m
+     direct = np.asarray(original_parts["direct"], dtype=np.float32)[m
+     path = np.asarray(original_parts["path"], dtype=np.float32)[m
+[36m@@ -123,24 +177,41 @@[m [mdef build_backbone([m
+ [m
+     cache_metadata: dict[str, object] = {}[m
+     permutation: list[int] | None = None[m
+[31m-    if spec.mode == "transe":[m
+[32m+[m[32m    if mode == "transe":[m
+         semantic = transe[m
+[31m-    elif spec.mode in {"slm", "slm_shuffled"}:[m
+[32m+[m[32m    elif mode in {"slm", "slm_shuffled"}:[m
+         if spec.slm_cache is 

@@ -1,0 +1,71 @@
+{
+  "baseline_name": "reference_kg_v1_reviewed_feasibility",
+  "frozen_on": "2026-09-02",
+  "status": "reviewed_feasibility_baseline_not_gold_kg",
+  "reviewer": [
+    "Noidealize"
+  ],
+  "edge_counts": {
+    "total": 9,
+    "accepted": 7,
+    "needs_review": 2
+  },
+  "accepted_triple_ids": [
+    "draft-001",
+    "draft-002",
+    "draft-003",
+    "draft-004a",
+    "draft-005a",
+    "draft-006",
+    "draft-007"
+  ],
+  "pending_triple_ids": [
+    "draft-004b",
+    "draft-005b"
+  ],
+  "unresolved_conflict_triple_ids": [
+    "draft-007"
+  ],
+  "projection": {
+    "sensor_order": [
+      "s2",
+      "s3",
+      "s4",
+      "s7",
+      "s8",
+      "s9",
+      "s11",
+      "s12",
+      "s13",
+      "s14",
+      "s15",
+      "s17",
+      "s20",
+      "s21"
+    ],
+    "shape": [
+      14,
+      14
+    ],
+    "nonzero": 16
+  },
+  "sha256": {
+    "snapshot": "6f81e28f6a7ffd36cdc54963c41fdd3a0763192912ac63b47d45e823b90a4a30",
+    "evidence_registry": "c1f892353b862c80e388d7890d33f10acd4e5b5542a49d51d89dc78242d51c95",
+    "schema": "6d161780b4e55e12fe31931eff6fec980900fa5e075344604fa14cf16409a5a7",
+    "projection_rules": "7fb0c2448541aa6c6ddf10cb6d430fd4e0a22f95198e7aa3e955a3923aa9d6cc",
+    "projection_matrix": "b693f0361797a2ea0ed91c8b2c91cc1f7ace87a2acd2786eca06a51c81f99beb"
+  },
+  "validation": {
+    "valid": true,
+    "errors": [],
+    "warnings": [],
+    "edge_count": 9,
+    "entity_count": 15
+  },
+  "constraints": {
+    "paper_evidence": false,
+    "official_test_used": false,
+    "gold_kg": false
+  }
+}

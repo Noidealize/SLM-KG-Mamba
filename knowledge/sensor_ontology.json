@@ -1,0 +1,27 @@
+{
+  "ontology_version": "cmapps_sensor_ontology_v1_draft",
+  "predictor_configuration_source": "external ma_rdg_mamba_rul/config.py; subset-specific statistics not reverified",
+  "sensors": [
+    {"id":"s1","symbol":"T2","description":"Fan inlet temperature","raw_sensor":true,"used_by_predictor":false,"drop_reason":"excluded_by_external_predictor_configuration"},
+    {"id":"s2","symbol":"T24","description":"LPC outlet temperature","raw_sensor":true,"used_by_predictor":true,"drop_reason":null},
+    {"id":"s3","symbol":"T30","description":"HPC outlet temperature","raw_sensor":true,"used_by_predictor":true,"drop_reason":null},
+    {"id":"s4","symbol":"T50","description":"LPT outlet temperature","raw_sensor":true,"used_by_predictor":true,"drop_reason":null},
+    {"id":"s5","symbol":"P2","description":"Fan inlet pressure","raw_sensor":true,"used_by_predictor":false,"drop_reason":"excluded_by_external_predictor_configuration"},
+    {"id":"s6","symbol":"P15","description":"Bypass-duct pressure","raw_sensor":true,"used_by_predictor":false,"drop_reason":"excluded_by_external_predictor_configuration"},
+    {"id":"s7","symbol":"P30","description":"HPC outlet pressure","raw_sensor":true,"used_by_predictor":true,"drop_reason":null},
+    {"id":"s8","symbol":"Nf","description":"Physical fan speed","raw_sensor":true,"used_by_predictor":true,"drop_reason":null},
+    {"id":"s9","symbol":"Nc","description":"Physical core speed","raw_sensor":true,"used_by_predictor":true,"drop_reason":null},
+    {"id":"s10","symbol":"epr","description":"Engine pressure ratio","raw_sensor":true,"used_by_predictor":false,"drop_reason":"excluded_by_external_predictor_configuration"},
+    {"id":"s11","symbol":"Ps30","description":"HPC outlet static pressure","raw_sensor":true,"used_by_predictor":true,"drop_reason":null},
+    {"id":"s12","symbol":"phi","description":"Fuel-flow to Ps30 ratio","raw_sensor":true,"used_by_predictor":true,"drop_reason":null},
+    {"id":"s13","symbol":"NRf","description":"Corrected fan speed","raw_sensor":true,"used_by_predictor":true,"drop_reason":null},
+    {"id":"s14","symbol":"NRc","description":"Corrected core speed","raw_sensor":true,"used_by_predictor":true,"drop_reason":null},
+    {"id":"s15","symbol":"BPR","description":"Bypass ratio","raw_sensor":true,"used_by_predictor":true,"drop_reason":null},
+    {"id":"s16","symbol":"farB","description":"Burner fuel-air ratio","raw_sensor":true,"used_by_predictor":false,"drop_reason":"excluded_by_external_predictor_configuration"},
+    {"id":"s17","symbol":"htBleed","description":"Bleed enthalpy","raw_sensor":true,"used_by_predictor":true,"drop_reason":null},
+    {"id":"s18","symbol":"Nf_dmd","description":"Demanded fan speed","raw_sensor":true,"used_by_predictor":false,"drop_reason":"excluded_by_external_predictor_configuration"},
+    {"id":"s19","symbol":"PCNfR_dmd","description":"Demanded corrected fan speed","raw_sensor":true,"used_by_predictor":false,"drop_reason":"excluded_by_external_predictor_configuration"},
+    {"id":"s20","symbol":"W31","description":"HPT coolant bleed flow","raw_sensor":true,"used_by_predictor":true,"drop_reason":null},
+    {"id":"s21","symbol":"W32","description":"LPT coolant bleed flow","raw_sensor":true,"used_by_predictor":true,"drop_reason":null}
+  ]
+}
