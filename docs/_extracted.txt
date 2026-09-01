@@ -1,0 +1,1159 @@
+Small but Mighty: Enhancing Time Series
+Forecasting with Lightweight LLMs
+Haoran Fan1, Bin Li2†, Yixuan Weng3 and Shoujun Zhou2
+1 College of Computer Science and Technology, Chongqing
+University of Posts and Telecommunications, Nan’an District,
+Chongqing, 400065, China.
+2 Shenzhen Institutes of Advanced Technology, Chinese Academy
+of Sciences, Nanshan District, Shenzhen, 518055, China.
+3 Westlake University, Xihu District, Hangzhou, Zhejiang,
+310024, China.
+Contributing authors: 2022212169@stu.cqupt.edu.cn;
+b.li2@siat.ac.cn; sj.zhou@siat.ac.cn; wengsyx@gmail.com;
+†Corresponding Author.
+Abstract
+While Large Language Models (LLMs) have demonstrated remarkable
+potential in time series forecasting, their practical deployment remains
+constrained by excessive computational demands and memory footprints.
+Existing LLM-based methods typically suffer from three critical limita-
+tions: (1) Inefficient parameter utilization in handling numerical time
+series patterns; (2) Modality misalignment between continuous tem-
+poral signals and discrete text embeddings; and (3) Inflexibility for
+real-time expert knowledge integration. We present Small but Mighty
+Enhancing Time Series (SMETimes), the first systematic investiga-
+tion of Small Language Models with sub-3B parameters (SLM) for
+efficient and accurate time series forecasting. Our method centers on
+three key innovations: (1) A statistically enhanced prompt structure
+that bridges numerical time series with textual semantics through
+descriptive statistical features; (2) An adaptive fusion embedding struc-
+ture that aligns temporal patterns with language model token spaces
+through learnable parameters; And (3) a dynamic mixture-of-experts
+structure enabled by SLMs’ computational efficiency, adaptively com-
+bining base predictions with domain-specific models. Extensive evalua-
+tions across seven benchmark datasets (ETTh1/2, ETTm1/2, Weather,
+1
+arXiv:2503.03594v2  [cs.CL]  9 Mar 2025
+
+
+2
+Enhancing Time Series Forecasting with Lightweight LLMs
+Solar, ECL) demonstrate that our 3B-parameter SLM achieves state-
+of-the-art performance on five primary datasets while maintaining 3.8×
+faster training and 5.2× lower memory consumption compared to 7B-
+parameter LLM baselines. In particular, the proposed model exhibits
+better learning capabilities, achieving 12.3% lower MSE than conven-
+tional LLM. Ablation studies validate that our statistically enhanced
+prompt structure and adaptive fusion embedding structure contribute,
+respectively, to the reduction of 15.7% and 18.2% errors in long-
+horizon forecasting tasks. By redefining the efficiency-accuracy trade-off
+landscape, this work establishes SLMs as viable alternatives to resource-
+intensive LLMs for practical time series forecasting. The code and
+models are available at https://github.com/xiyan1234567/SMETimes.
+Keywords: Small Language Models, Statistically Enhanced Prompt, Adapti-
+ve Fusion Embedding, Dynamic Mixture-of-Experts
+1 Introduction
+Time series forecasting is the cornerstone of modern decision-making sys-
+tems, with critical applications spanning energy management [30], financial
+markets [42], climate modeling [1] and intelligent transportation [23]. Tradi-
+tional methods often rely on domain-specific statistical models [2] or deep
+neural networks [3], which require substantial computational resources and
+extensive domain expertise. Although Large Language Models (LLMs) have
+recently demonstrated remarkable capabilities in time series forecasting [4, 21],
+their practical deployment faces significant challenges due to prohibitive
+computational costs and memory footprints [5].
+The recent proliferation of LLM-based forecasting methods [6, 7] has
+revealed three fundamental limitations: (1) Massive parameter counts (typ-
+ically >7B) lead to inefficient training/inference; (2) Inadequate alignment
+between numerical time series patterns and textual embeddings; And (3)
+limited flexibility to integrate domain-specific expert knowledge. As shown
+in Fig. 1, conventional LLM methods such as Time-LLM [4] (22.33G mem-
+ory) and AutoTimes [18] (23.12G memory) incur substantial resource costs
+despite comparable MSE performance to our 1B-parameter SLM (4.33G mem-
+ory). This efficiency gap becomes particularly critical in real-world deployment
+scenarios with hardware constraints.
+To alleviate the computational inefficiency of Large Language Models
+(LLMs) in time series forecasting, we propose a feature fusion strategy through
+Small Language Models (SLMs) that strategically reduce model scale while
+incorporating targeted architectural innovations to achieve better efficiency.
+Our key insight lies in three synergistic components: (1) Statistically enhanced
+prompt structure that bridges numerical and textual domains; (2) An adaptive
+fusion embedding structure for time series embeddings; And (3) a dynamic
+
+
+Enhancing Time Series Forecasting with Lightweight LLMs
+3
+Fig. 1: Performance-efficiency Trade-off Comparison on ETTh1 [11] Dataset. Our
+SLM variants (blue) achieve competitive MSE with significantly lower training time
+and memory footprint compared to conventional LLM-based methods. Bubble size
+represents relative memory consumption.
+mixture-of-experts structure enabled by SLMs’ lightweight structure. Exten-
+sive experiments on seven benchmark datasets (ETTh1/2 [11], ETTm1/2 [11],
+Weather [12], Solar [29], ECL [12]) demonstrate that our 1B parameter SLM
+achieves state-of-the-art results on five primary datasets while maintaining
+competitive performance on the remaining three.
+Our work makes four fundamental contributions to the field of efficient
+time series forecasting:
+• To the best of our knowledge, this is the first work to develop and evalu-
+ate a framework that applies Small Language Models (SLMs) to time series
+forecasting tasks. Through targeted architectural modifications, we demon-
+strate that compact models achieve performance parity with 7B-parameter
+Large Language Models (LLMs) while attaining 3.2× accelerated training
+convergence and 5.1× reduced memory footprint, substantially improving
+deployment feasibility in resource-constrained environments.
+• We introduce a new prompting methodology that integrates temporal statis-
+tics with domain-specific contextual metadata. Empirical validation reveals
+that this statistically enhanced prompt structure reduces the mean squared
+error by 12.7% compared to conventional textual prompting baselines
+through systematic ablation analysis.
+• Our adaptive fusion embedding structure addresses the intrinsic modality
+gap between continuous time series embeddings and discrete token represen-
+tations. By implementing learnable projective transformations coupled with
+
+
+4
+Enhancing Time Series Forecasting with Lightweight LLMs
+attention-based feature alignment, the proposed structure yields 9.3% accu-
+racy improvement on extended forecasting horizons compared to standard
+embedding methods.
+• The dynamic mixture-of-experts structure developed synergistically com-
+bines the predictions of the base model with established temporal modeling
+techniques, including ARIMA [24] and Prophet [25]. This hybrid structure
+achieves a reduction of 4.8% MSE while maintaining 2.1× faster inference
+speeds compared to monolithic LLM implementations, demonstrating an
+effective balance between computational efficiency and forecast precision.
+The remainder of this paper is organized as follows. Section 2 reviews
+traditional approaches for time series forecasting, LLM-based methodologies,
+and SLM analysis in this domain. Section 3 details our framework design
+details and technical innovations. Section 4 introduces datasets, implementa-
+tion specifics, comprehensive experiments, and ablation studies, while Section 5
+discusses the limitations of our model. We conclude with future research
+directions in Section 7.
+2 Related Work
+2.1 Time Series Forecasting Methods
+2.1.1 Traditional Methods
+Traditional time series forecasting has long relied on domain-specific sta-
+tistical models and classical machine learning techniques. Methods such as
+ARIMA [24] and its variants (e.g. SARIMA [26]) leverage autoregressive and
+moving average components to model temporal dependencies but struggle
+with nonlinear patterns and multivariate data [2]. Exponential smoothing [27]
+and state-space models (SSMs) [8] further incorporate trend and seasonal-
+ity decomposition, yet their rigidity limits adaptability to complex real-world
+scenarios. With the rise of deep learning, structures such as LSTMs [9] and
+Temporal Convolutional Networks (TCNs) [22] emerged as powerful tools
+for sequence modeling. Transformers [10], initially designed for NLP, were
+later adapted for time series [40, 41] to capture long-range dependencies
+through self-attention. Although these methods achieve strong performance
+on narrow tasks, they require extensive domain expertise, task-specific tun-
+ing, and large-scale training data, limiting their generalizability across diverse
+applications [13].
+2.1.2 LLM-Based Methods
+Recent advances in Large Language Models (LLMs) have inspired their adapta-
+tion to time series forecasting. Pioneering work like FPT [20] and Time-LLM [4]
+demonstrated that LLMs trained on textual data can be repurposed for tem-
+poral modeling through cross-modal alignment. For example, LLMTime [7]
+treats time series as numerical tokens, enabling zero-shot forecasting via LLMs’
+inherent pattern recognition capabilities. Methods such as PromptCast [14]
+
+
+Enhancing Time Series Forecasting with Lightweight LLMs
+5
+and TEMPO [15] further refine prompting strategies to bridge numerical and
+textual modalities. However, these methods inherit critical limitations from
+their reliance on massive LLMs (e.g., GPT-3 [28], Llama [5]): (1) Excessive
+computational costs (e.g., AutoTimes [18] requires 23.12GB memory); (2) Sub-
+optimal alignment between continuous time series data and discrete token
+embeddings; And (3) Inflexibility in integrating domain-specific knowledge
+without costly fine-tuning. Although autoregressive LLM-based methods like
+Time-LLM [4] achieve variable-length predictions, they suffer from quadratic
+attention complexity and high inference latency, rendering them impractical
+for resource-constrained environments.
+2.2 Small Language Models for Time Series Forecasting
+Recent advances in SLM-based time series analysis have primarily addressed
+classification and edge deployment challenges, yet critical gaps persist in
+forecasting tasks. While Voice2Series [16] and EdgeTS [17] demonstrate the
+feasibility of parameter-efficient SLMs for temporal pattern recognition, their
+focus on short-term classification or latency reduction overlooks the intrinsic
+complexities of multistep forecasting. These include modeling cross-variable
+dependencies, adapting to nonstationary temporal dynamics, and propagating
+uncertainty over extended horizons, challenges exacerbated by the absence of
+explicit semantic priors in pure numerical sequences. The existing LLM-based
+forecasting structure [4, 14] partially addresses these issues through language-
+aligned prompting but introduces modality misalignment when fusing time
+series tokens with textual instructions. Our work bridges this gap by leveraging
+SLMs’ architectural flexibility to natively encode temporal semantics through
+quantized embeddings and timestamp-informed attention structures. By inte-
+grating calendar-aware positional encoding with adaptive quantization, we
+enable SLMs to capture cyclical patterns and event-driven anomalies without
+cross-modal feature fusion, simultaneously preserving computational efficiency
+for deployment on resource-constrained edge devices. This method extends the
+SLM paradigm beyond classification-centric designs, addressing the understud-
+ied trade-off between long-term dependency modeling and real-time inference
+in forecasting applications.
+3 Methodology
+As shown in Fig. 2, the proposed SMETimes framework features three prin-
+cipal components: (1) Statistically enhanced prompt structure; (2) Adaptive
+fusion embedding structure with dynamic gating structures; And (3) dynamic
+mixture-of-experts structure, the methodology systematically elaborates these
+components through dedicated technical sections: Section 3.1 formalizes the
+numerical-textual alignment process by statistical prompting, Section 3.2
+specifies the implementation details of the dynamic gating framework, and
+
+
+6
+Enhancing Time Series Forecasting with Lightweight LLMs
+Fig. 2: Structure of the proposed SMETimes framework, featuring three core inno-
+vations: (1) Statistically enhanced prompt structure for numerical-textual alignment;
+(2) Adaptive fusion embedding structure with dynamic gating structures; And (3)
+dynamic Mixture-of-Experts structure for efficient specialization.
+Section 3.3 delineates the parameter allocation strategy for the MoE special-
+ization module. This tripartite structure maintains strict correspondence with
+the architectural diagram while establishing technical reproducibility.
+3.1 Statistically Enhanced Prompt Structure
+To bridge the gap between numerical time series patterns and natural lan-
+guage semantics, we propose a statistically enhanced prompt structure that
+generates linguistically interpretable embeddings through domain-specific sta-
+tistical features and timestamp contextualization. Given a univariate time
+series X = {x1, . . . , xT } ∈RT , we first partition it into N non-overlapping
+segments following the sliding window strategy in this work [3]:
+si = {x(i−1)S+1, . . . , xiS} ∈RS,
+i = 1, . . . , N,
+N = ⌊T/S⌋
+(1)
+where S denotes the segment length controlling temporal granularity. The
+selection of S follows the domain-specific periodicity validated by the sensitiv-
+ity analysis in Section 4.5. And N represents the total segment count.
+Each segment si undergoes parallel processing through two complementary
+descriptors: the timestamp descriptor and the statistical descriptor.
+3.1.1 Timestamp Descriptor
+To obtain the input of the timestamp descriptor and the statistical descrip-
+tor, we give a variable X′ = {x′
+1, . . . , x′
+N} ∈RN. It represents the Text
+Data of this N time series. The timestamp descriptor Ti converts the
+start/end timestamps of si into natural language phrases (e.g., “The time
+
+
+Enhancing Time Series Forecasting with Lightweight LLMs
+7
+Fig. 3: This prompt structure combines Timestamp Descriptor and Statistical
+Descriptor to systematically characterize time series data.
+range of this sequence is from 03-Jan-2023 08:00 to 03-Jan-2023 12:00”) via
+TimeStampDescriptor(·).
+3.1.2 Statistical Descriptor
+For statistical descriptor, the Si extracts distributional properties using
+StatisticalDescriptor(·):
+StatisticalDescriptor(si) = [µ(si), σ(si), ∇(si)] ∈R3
+(2)
+Si = StatisticalDescriptor(si)
+(3)
+where µ(·), σ(·), and ∇(·) compute the mean, standard deviation, and the
+change in the sequence respectively, inspired by feature engineering in this
+work [32].
+After obtaining Ti and Si, we can splice them together:
+Ai = Ti ⊕Si
+(4)
+where ⊕represents stitching Ti and Si together and then we get Ai.
+As shown in Fig. 3, this is the demonstration of the stitching operation.
+The Ai is encoded through frozen LLM layers from pre-trained models [35],
+with SelectFinal(·) extracting the final-dimension representation TEi ∈RD,
+where D stands for LLM hidden dimension. This hybrid design ensures TEi
+encodes both numerical regularity and contextual temporality, establishing
+cross-modal alignment while avoiding redundant LLM computations during
+training through offline precomputation [4].
+3.2 Adaptive Fusion Embedding Structure
+To establish a synergistic interaction between numerical time series pat-
+terns and language-derived semantic context, we propose an adaptive fusion
+embedding structure that dynamically combines modality-specific embeddings
+through learnable gating. As shown in Fig. 2, this structure processes two
+complementary representations for each time series segment:
+
+
+8
+Enhancing Time Series Forecasting with Lightweight LLMs
+(1) Numerical Embedding (SEi): Captures intrinsic temporal dynamics
+through parameterized segment encoding:
+SEi = SegmentEmbedding(si) ∈RD
+(5)
+where SegmentEmbedding(·) implements learnable linear projections followed
+by GeLU activation [39], transforming raw series segments into latent vectors
+aligned with LLM dimensions.
+(2) Semantic Embedding (TEi): Encodes domain-specific statistical fea-
+tures and temporal context through frozen LLM processing of hybrid prompts:
+TEi = SelectFinal (LLMLayers (Ti ⊕Si)) ∈RD
+(6)
+where Ti denotes timestamp descriptors and Si contains statistical features as
+defined in Section 3.1.
+The fusion process adaptively adjusts modality contributions through a
+learnable gating parameter θ ∈R:
+Ei = σ(θ)
+|{z}
+α
+·SEi + (1 −σ(θ))
+|
+{z
+}
+1−α
+·TEi
+(7)
+where σ(·) denotes the sigmoid function constraining α ∈(0, 1), the train-
+able θ automatically learns optimal fusion ratios from data, offering two key
+advantages such as dynamic adaptation to varying temporal regimes (e.g., pri-
+oritizing SEi during stable periods while emphasizing TEi when encountering
+anomalous patterns), and the bounded gating range prevents abrupt modality
+switching, with gradient flow governed by:
+∂Ei
+∂θ = σ(θ)(1 −σ(θ))(SEi −TEi)
+(8)
+This formulation ensures smooth gradient propagation to both modalities
+regardless of α values.
+3.3 Dynamic Mixture-of-Experts Structure
+To enhance the model’s capacity for capturing diverse temporal patterns, we
+design a dynamic mixture-of-experts structure that enables specialized feature
+learning through parameterized projection gates. The structure operates on
+contextualized embeddings {ˆEi} ∈RB×D generated by LLM layers, where B
+denotes the batch size and D the hidden dimension.
+The core innovation lies in training K expert projections with spar-
+sity constraints, where each expert Wk ∈RD×D learns distinct temporal
+dynamics. The gating structure computes modality selection weights through
+
+
+Enhancing Time Series Forecasting with Lightweight LLMs
+9
+dimension-specific transformation:
+G = Softmax
+
+LinearD→K(ˆE)
+
+∈RB×K
+(9)
+where LinearD→K(·) projects each D-dimensional embedding to K gating
+logits. The softmax operation ensures PK
+k=1 G[i, k] = 1 for each sample i,
+implementing competitive expert selection.
+Each expert transforms the input embeddings through independent linear
+projections:
+Hk = ˆEWk ∈RB×D,
+k = 1, . . . , K
+(10)
+The final prediction combines expert outputs through gated summation:
+ˆS =
+K
+X
+k=1
+G[:, k] ⊙Hk ∈RB×D
+(11)
+where ⊙denotes broadcasted element-wise multiplication. This allows the
+model to adaptively emphasize different experts for varying temporal regimes
+(e.g., periodic patterns vs. transient anomalies).
+The training objective combines reconstruction accuracy with expert
+specialization through a compound loss function:
+L =
+1
+BS
+B
+X
+i=1
+∥si −ˆSi∥2
+2
+|
+{z
+}
+LMSE
++ λ · ∥G∥1
+|
+{z
+}
+Lexp
+(12)
+where LMSE ensures point-wise prediction fidelity and Lexp imposes L1
+regularization on the gate matrix G to encourage sparse expert activation.
+The hyperparameter λ from {0.01, 0.1, 0.5} choose one of the best results.
+This constraint drives the gating distribution toward one-hot vectors, enforc-
+ing expert specialization while maintaining end-to-end differentiability. The
+empirical results in Section 4.3 show that this reduces the usage of redundant
+parameters by 38% compared to standard MoE designs.
+4 Experiments
+4.1 Experimental Settings
+4.1.1 Dataset Descriptions
+The experimental evaluation utilizes seven real-world datasets that cover crit-
+ical temporal domains. The ETTh1/2 [11] and ETTm1/2 [11] datasets are
+hourly and 15-minute resolution records of electricity transformer temperature
+measurements spanning two years, each containing seven operational parame-
+ters. The Weather [12] dataset is a collection of 21 meteorological parameters
+
+
+10
+Enhancing Time Series Forecasting with Lightweight LLMs
+recorded every 10 minutes throughout 2020 from a professional weather mon-
+itoring station. The ECL [12] dataset contains hourly data on electricity
+consumption from 321 industrial and residential users. The Solar-Energy [29]
+data set comprises 10-minute interval solar power generation records from 137
+photovoltaic plants during 2006. Details of all data sets are shown in Table 1.
+All data sets adhere to rigorous temporal partitioning protocols in which
+training, validation, and test sets are maintained in strict chronological order
+to prevent information leakage. For long-term forecasting evaluations, we stan-
+dardize the context window to 672 historical time steps in all data sets, with
+prediction horizons systematically extended to {96, 192, 336, 720} steps. This
+multiscale configuration challenges models to capture both short-term fluc-
+tuations and long-term trends across energy, meteorological, and industrial
+operational scenarios.
+Table 1: Detailed dataset descriptions. Dim denotes the variate number. Dataset
+Size denotes the total number of time points in {Train, Validation, Test} splits respec-
+tively. Forecast Length denotes the future time points to be predicted. Frequency
+denotes the sampling interval of time points.
+Dataset
+Dim
+Forecast Length
+Dataset Size
+Frequency
+Information
+ETTh1 [11]
+7
+{96, 192, 336, 720}
+(8545, 2881, 2881)
+Hourly
+Temperature
+ETTh2 [11]
+7
+{96, 192, 336, 720}
+(8545, 2881, 2881)
+Hourly
+Temperature
+ETTm1 [11]
+7
+{96, 192, 336, 720}
+(34465, 11521, 11521)
+15min
+Temperature
+ETTm2 [11]
+7
+{96, 192, 336, 720}
+(34465, 11521, 11521)
+15min
+Temperature
+Weather [12]
+21
+{96, 192, 336, 720}
+(36792, 5271, 10540)
+10min
+Weather
+ECL [12]
+321
+{96, 192, 336, 720}
+(18317, 2633, 5261)
+Hourly
+Electricity
+Solar-Energy [29]
+137
+{96, 192, 336, 720}
+(36601, 5161, 10417)
+10min
+Energy
+The stability of the model is quantified through triplicate experiments with
+random initializations, as detailed in Table 2. The observed marginal stan-
+dard deviations (MSE: 0.001-0.004; MAE: 0.001-0.004 across all prediction
+horizons) indicate a strong resilience to parameter initialization variance. Par-
+ticularly noteworthy is the consistent performance on the 720-step forecasting
+task, exemplified by ETTh1’s [11] MSE of 0.414±0.004, which demonstrates
+robust temporal pattern capture over extended horizons. These results collec-
+tively suggest that SMETimes learns intrinsic temporal dynamics rather than
+superficial data correlations, as evidenced by its seed-invariant performance
+characteristics.
+4.1.2 Comparison Methods
+We perform a benchmark evaluation of SMETimes against two categories of
+contemporary methods: (1) Large Language Model (LLM) based forecasters,
+encompassing AutoTimes [18], TimeLLM [4], UniTime [19] and FPT [20]; And
+
+
+Enhancing Time Series Forecasting with Lightweight LLMs
+11
+Table 2: Performance and standard deviations of SMETimes. Results come from
+three random seeds.
+Dataset
+ETTh1 [11]
+ETTh2 [11]
+ETTm1 [11]
+Horizon
+MSE
+MAE
+MSE
+MAE
+MSE
+MAE
+96
+0.354±0.002
+0.395±0.001
+0.282±0.002
+0.347±0.002
+0.283±0.003
+0.344±0.002
+192
+0.382±0.003
+0.413±0.001
+0.342±0.002
+0.389±0.001
+0.328±0.002
+0.372±0.001
+336
+0.396±0.002
+0.424±0.002
+0.365±0.003
+0.413±0.002
+0.361±0.002
+0.393±0.002
+720
+0.414±0.004
+0.446±0.002
+0.406±0.002
+0.446±0.003
+0.415±0.003
+0.425±0.002
+Dataset
+ETTm2 [11]
+Weather [12]
+ECL [12]
+Horizon
+MSE
+MAE
+MSE
+MAE
+MSE
+MAE
+96
+0.174±0.002
+0.259±0.002
+0.156±0.001
+0.206±0.001
+0.132±0.001
+0.229±0.001
+192
+0.234±0.002
+0.299±0.003
+0.205±0.002
+0.253±0.002
+0.151±0.001
+0.247±0.001
+336
+0.286±0.002
+0.335±0.003
+0.260±0.003
+0.295±0.003
+0.168±0.001
+0.265±0.001
+720
+0.372±0.003
+0.392±0.004
+0.334±0.004
+0.347±0.004
+0.203±0.002
+0.295±0.001
+Dataset
+Solar-Energy [29]
+Solar-Energy [29]
+Horizon
+MSE
+MAE
+96
+0.173±0.001
+0.224±0.001
+192
+0.195±0.001
+0.242±0.001
+336
+0.216±0.001
+0.257±0.002
+720
+0.245±0.002
+0.275±0.003
+(2) specialized temporal models, comprising DLinear [31], PatchTST [32], and
+TimesNet [33]. Each baseline is meticulously implemented utilizing their offi-
+cial configurations or reproduced as per the procedures outlined in the original
+publications. To ensure equity, we standardize the input sequence length to 672
+time steps and prediction horizons to {96, 192, 336, 720} across all methods,
+while maintaining dataset-specific normalization and augmentation strategies.
+4.1.3 Implementation Details
+The SMETimes employs a 3B-parameter structure optimized for temporal
+modeling. For SegmentEmbedding, we implement them using either a linear
+layer or an MLP. We adopt Channel Independence [32] for multivariate time
+series modeling. Training uses AdamW [34] with an initial learning rate in
+{1e-2, 1e-3, 5e-4}, batch sizes of 256, and 10 training epochs. Experiments
+are conducted using PyTorch [38] with six NVIDIA 4090 GPUs acceleration.
+Unless otherwise specified, we use LLaMA-3B [35] as the default base LLM.
+The code and data are publicly released on https://github.com/xiyan1234567/
+SMETimes.
+4.2 Main Results
+As shown in Table 3, SMETimes demonstrates better performance compared
+to state-of-the-art baselines, including both LLM-based methods (Auto-
+Times [18], TimeLLM [4]) and specialized forecasting models (DLinear [31],
+
+
+12
+Enhancing Time Series Forecasting with Lightweight LLMs
+PatchTST [32]). Our 3B-parameter model achieves the best average MSE/-
+MAE on 5/7 datasets (ETTh1/2 [11], ETTm1/2 [11], ECL [12]), validating
+its architectural advantage in context length adaptation (C =672). Although
+SMETimes excels in long-horizon forecasting, reducing MSE by 6.9% against
+AutoTimes [18] on ETTh1 [11] (720 step) analysis reveals instability in
+other LLM-based methods: AutoTimes [18] suffers a 13.5% error increase on
+ETTh2 [11] at equivalent horizons, and TimeLLM [4] shows severe degradation
+under extreme lengths (ECL-720 [12] MSE 0.258 vs SMETimes 0.203), reflect-
+ing limitations in conservative temporal strategies. Notably, UniTime’s [19]
+consistent underperformance highlights the inadequacy of direct LLM capa-
+bility transfer to temporal tasks.
+For specialized models, PatchTST [32] is effective in capturing local peri-
+odicity for weather data, while DLinear [31] remains competitive in short-term
+scenarios but incurs prohibitive errors beyond 336-step predictions. SMETimes
+further demonstrates efficiency gains, maintaining 3.8× faster training than
+AutoTimes [18] and 12.3% lower MSE with 5.2× reduced memory consump-
+tion in high-dimensional ECL [12] data. These results collectively emphasize
+the importance of balancing learned temporal reasoning with domain-specific
+inductive biases.
+4.3 Dynamic Mixture-of-Experts Framework Analysis
+Table 4 reveals that the dynamic mixture-of-experts framework demonstrates
+dual advantages in temporal forecasting. First, it exhibits universal adaptabil-
+ity across diverse model architectures (LLaMA [35], OPT [36], GPT2 [37]) and
+data characteristics. With the dynamic mixture-of-experts framework, the pre-
+diction accuracy is highly versatile across models of different sizes or data sets
+of different types. This adaptability stems from its capacity to decompose com-
+plex temporal dependencies through specialized expert collaboration rather
+than relying solely on parameter scaling. Second, the framework establishes a
+lightweight paradigm for resource-efficient deployment. Smaller models inte-
+grated with the dynamic mixture-of-experts framework achieve competitive
+performance comparable to larger baselines by selectively activating domain
+experts, effectively balancing capacity and computational cost. This syn-
+ergy of generalization and efficiency positions the dynamic mixture-of-experts
+framework as a strategic enabler for scalable time-series intelligence.
+4.4 Ablation Studies
+Systematic ablation studies validate the necessity of the core components of
+SMETimes, as shown in Table 5. Disabling the statistically enhanced prompt
+structure (w/o Context) degrades forecasting accuracy by 9.2% average MSE
+across all benchmarks, indicating the critical role of contextual statistical
+features in temporal pattern recognition. The adaptive fusion embedding struc-
+ture is essential for cross-modal alignment—its removal (w/o Fusion) causes
+15.7% overall performance deterioration, with particularly severe degradation
+
+
+Enhancing Time Series Forecasting with Lightweight LLMs
+13
+Table 3: Full long-term forecasting results: we perform rolling forecasting with a
+single model trained on each data set and achieve the four desired forecast lengths
+in {96, 192, 336, 720}. The SMETimes adapts LLMs with context length C = 672,
+while other methods use input length L = 672 and output length F = 96. Bold
+numbers indicate the best performance for each data set and per prediction length,
+with underlined numbers denoting the second-best results.
+Method SMETimes AutoTimes [18] TimeLLM [4] UniTime [19] FPT [20] DLinear [31] PatchTST [32] TimesNet [33]
+Metric MSE MAE MSE
+MAE
+MSE MAE MSE MAE MSE MAE MSE MAE MSE MAE MSE MAE
+ETTh1 [11]
+96
+0.354 0.395 0.364
+0.403
+0.378 0.416 0.380 0.408 0.400 0.402 0.367 0.402 0.375 0.401 0.442 0.453
+192 0.382 0.413 0.389
+0.421
+0.405 0.437 0.589 0.532 0.416 0.438 0.407 0.425 0.406 0.421 0.462 0.469
+336 0.396 0.424 0.405
+0.432
+0.432 0.449 0.699 0.652 0.445 0.453 0.436 0.448 0.421 0.432 0.486 0.487
+720 0.414 0.446 0.418 0.445 0.445 0.465 0.853 0.689 0.475 0.492 0.440 0.512 0.436 0.459 0.543 0.543
+Avg 0.387 0.420 0.394
+0.425
+0.415 0.442 0.630 0.570 0.434 0.446 0.413 0.447 0.410 0.428 0.483 0.488
+ETTh2 [11]
+96
+0.282 0.347 0.292
+0.354
+0.294 0.348 0.304 0.357 0.294 0.367 0.291 0.362 0.290 0.354 0.335 0.367
+192 0.342 0.389 0.363
+0.402
+0.365 0.391 0.382 0.403 0.365 0.403 0.385 0.421 0.352 0.392 0.398 0.405
+336 0.365 0.413 0.399
+0.435
+0.387 0.423 0.418 0.438 0.389 0.421 0.451 0.472 0.345 0.406 0.451 0.456
+720 0.406 0.446 0.461
+0.480
+0.423 0.453 0.429 0.453 0.412 0.453 0.604 0.548 0.412 0.438 0.467 0.476
+Avg 0.349 0.399 0.379
+0.418
+0.367 0.404 0.383 0.413 0.365 0.411 0.433 0.451 0.350 0.398 0.413 0.426
+ETTm1 [11]
+96
+0.283 0.344 0.294
+0.352
+0.299 0.358 0.332 0.367 0.297 0.349 0.302 0.345 0.295 0.347 0.345 0.369
+192 0.328 0.372 0.337
+0.378
+0.332 0.379 0.358 0.398 0.334 0.375 0.338 0.374 0.335 0.372 0.382 0.398
+336 0.361 0.393 0.372
+0.400
+0.378 0.407 0.387 0.412 0.368 0.396 0.372 0.394 0.374 0.394 0.412 0.423
+720 0.415 0.425 0.427
+0.432
+0.433 0.431 0.464 0.452 0.421 0.434 0.431 0.431 0.421 0.423 0.483 0.463
+Avg 0.347 0.384 0.358
+0.391
+0.361 0.394 0.385 0.407 0.355 0.389 0.361 0.386 0.356 0.384 0.406 0.413
+ETTm2 [11]
+96
+0.174 0.259 0.182
+0.268
+0.178 0.261 0.187 0.270 0.178 0.268 0.178 0.265 0.172 0.260 0.189 0.273
+192 0.234 0.299 0.245
+0.310
+0.243 0.304 0.254 0.317 0.235 0.306 0.237 0.306 0.239 0.302 0.253 0.315
+336 0.286 0.335 0.300
+0.347
+0.293 0.342 0.323 0.358 0.291 0.348 0.291 0.351 0.289 0.337 0.328 0.359
+720 0.372 0.392 0.377
+0.398
+0.379 0.402 0.432 0.421 0.385 0.406 0.403 0.435 0.376 0.397 0.415 0.418
+Avg 0.267 0.321 0.276
+0.331
+0.273 0.327 0.299 0.342 0.272 0.332 0.277 0.339 0.269 0.324 0.296 0.341
+Weather [12]
+96
+0.156 0.206 0.154
+0.205 0.149 0.202 0.183 0.234 0.159 0.209 0.172 0.234 0.150 0.201 0.173 0.234
+192 0.205 0.253 0.204
+0.254 0.195 0.250 0.432 0.435 0.203 0.259 0.216 0.269 0.196 0.248 0.229 0.275
+336 0.260 0.295 0.260
+0.297
+0.253 0.291 0.534 0.563 0.256 0.293 0.263 0.309 0.246 0.290 0.298 0.321
+720 0.334 0.347 0.336
+0.348
+0.325 0.346 0.601 0.578 0.328 0.348 0.335 0.358 0.319 0.342 0.387 0.375
+Avg 0.239 0.275 0.239
+0.276
+0.231 0.272 0.438 0.453 0.237 0.277 0.247 0.293 0.228 0.270 0.272 0.301
+ECL [12]
+96
+0.132 0.229 0.135
+0.234
+0.138 0.243 0.173 0.258 0.139 0.243 0.140 0.243 0.132 0.240 0.173 0.278
+192 0.151 0.247 0.155
+0.253
+0.163 0.265 0.284 0.367 0.160 0.263 0.154 0.256 0.154 0.254 0.183 0.285
+336 0.168 0.265 0.174
+0.271
+0.186 0.295 0.367 0.431 0.185 0.297 0.175 0.275 0.173 0.274 0.194 0.305
+720 0.203 0.295 0.207
+0.302
+0.258 0.354 0.442 0.487 0.264 0.364 0.211 0.312 0.226 0.325 0.223 0.325
+Avg 0.164 0.259 0.168
+0.265
+0.186 0.289 0.317 0.386 0.187 0.292 0.170 0.272 0.171 0.273 0.193 0.298
+Solar [29]
+96
+0.173 0.224 0.171 0.225
+0.213 0.276 0.234 0.281 0.194 0.268 0.189 0.254 0.182 0.243 0.190 0.267
+192 0.195 0.242 0.194 0.243
+0.237 0.302 0.382 0.443 0.221 0.298 0.213 0.269 0.203 0.258 0.201 0.270
+336 0.216 0.257 0.215 0.250 0.254 0.321 0.453 0.543 0.254 0.323 0.231 0.287 0.224 0.276 0.221 0.301
+720 0.245 0.275 0.231 0.268 0.289 0.373 0.534 0.618 0.298 0.367 0.248 0.302 0.246 0.315 0.254 0.324
+Avg 0.207 0.250 0.203 0.247 0.248 0.318 0.401 0.471 0.242 0.314 0.220 0.278 0.214 0.273 0.217 0.291
+on the Weather [12] dataset (18.2% MSE increase). Most crucially, deactiva-
+tion of the MoE structure (w/o MoE) results in 12.4% average accuracy loss,
+peaking at 15.1% MSE reduction on Solar [29] predictions, which demonstrates
+the effectiveness of expert specialization in handling heterogeneous temporal
+
+
+14
+Enhancing Time Series Forecasting with Lightweight LLMs
+Table 4: Performance promotion obtained by our Dynamic Mixture-of-Experts
+Framework. We report the average performance and the relative MSE reduction
+(Promotion), where bold numbers indicate the best performance of different LLMs
+as backbone in different data sets.The Original entries denote the baseline SME-
+Times performance without employing the dynamic mixture-of-experts framework,
+providing direct ablation comparisons.
+Experiment
+LLaMA-3B [35]
+LLaMA-1B [35]
+OPT-2.7B [36]
+OPT-1.3B [36]
+GPT2-124M [37]
+Setting
+MSE
+MAE
+MSE
+MAE
+MSE
+MAE
+MSE
+MAE
+MSE
+MAE
+Weather [12]
+Original
+0.269
+0.321
+0.276
+0.329
+0.258
+0.312
+0.263
+0.324
+0.279
+0.341
++MoE
+0.239
+0.275
+0.235
+0.273
+0.235
+0.272
+0.239
+0.275
+0.243
+0.281
+Promotion +11.1% +14.3% +14.9% +17.0% +8.9% +12.8% +9.1% +15.1% +12.9% +17.6%
+ECL [12]
+Original
+0.178
+0.276
+0.186
+0.281
+0.175
+0.271
+0.185
+0.279
+0.193
+0.293
++MoE
+0.159
+0.254
+0.164
+0.259
+0.158
+0.254
+0.159
+0.255
+0.174
+0.266
+Promotion +10.7% +8.0% +11.8% +7.8%
++9.7%
++6.3% +14.1% +8.6%
++9.8%
++9.2%
+Solar [29]
+Original
+0.234
+0.281
+0.245
+0.287
+0.232
+0.297
+0.245
+0.287
+0.255
+0.312
++MoE
+0.207
+0.250
+0.205
+0.252
+0.208
+0.262
+0.208
+0.259
+0.219
+0.278
+Promotion +11.5% +11.0% +16.3% +12.2% +10.3% +11.8% +15.1% +9.8% +14.1% +10.9%
+patterns. These empirical findings collectively substantiate the rationality of
+our architectural design and component-wise contributions.
+Table 5: Ablation of method designs. For each dataset, we report the average value
+for all predictive lengths. Bold numbers represent the best performance for a par-
+ticular combination of modules in the same data set. Underlined numbers represent
+the second-best performance.
+Experiment
+Setting
+Module
+ETTh1 [11]
+ETTh2 [11]
+ETTm1 [11]
+ETTm2 [11]
+Context Fusion MoE
+MSE
+MAE
+MSE
+MAE
+MSE
+MAE
+MSE
+MAE
+Original
+✓
+✓
+✓
+0.387 0.420 0.349 0.399 0.347 0.384 0.267 0.321
+w/o Context
+✓
+✗
+✗
+0.391
+0.427
+0.356
+0.402
+0.349
+0.387
+0.269
+0.327
+w/o Fusion
+✗
+✓
+✗
+0.428
+0.452
+0.398
+0.437
+0.359
+0.386
+0.287
+0.347
+w/o MoE
+✗
+✗
+✓
+0.403
+0.442
+0.382
+0.423
+0.356
+0.399
+0.289
+0.342
+4.5 Hyperparameter Sensitivity
+As shown in Fig. 4, comprehensive analyzes across representative datasets
+(ETTh1 [11], ETTm1 [11], Weather [12], ECL [12]) reveal the stable perfor-
+mance of the proposed SMETimes under varying configurations. The bolded
+points represent the best results in this dataset. The model achieves peak
+accuracy with 672-step input sequences (equivalent to a one-week context for
+hourly data), where shortening the inputs to 480 steps induces merely 1.3%
+MSE degradation. Temporal segmentation analysis identifies 96-step windows
+as optimal to align language model processing with periodic patterns, while
+hidden dimension studies demonstrate that 512-channel projections optimally
+balance computational efficiency and representational capacity: Expanding to
+1024 dimensions yields diminishing returns (<0.9% accuracy gain despite 2.1×
+
+
+Enhancing Time Series Forecasting with Lightweight LLMs
+15
+computation overhead). In particular, the framework exhibits robust gener-
+alization, maintaining performance within ±5% of optimal MSE across all
+hyperparameter combinations tested, confirming its reliability for practical
+deployment.
+(a): Hidden Dimension
+(b): Input Length
+(c): Segment Length
+Fig. 4: Hyperparameter sensitivity of SMETimes. Each curve presents a specific
+dataset.
+4.6 Showcases
+As demonstrated in Fig. 5, we present a comparative analysis of long-term
+forecasting performance under the input-672-predict-96 configuration using
+the ETTh1 [11] dataset. The subgraphs Fig. 5(a1) and Fig. 5(a2) demonstrate
+that our SMETimes can effectively capture temporal patterns with more stable
+predictions, indicating its strong capability to learn time series dynamics. In
+contrast, the subgraphs Fig. 5(b1), Fig. 5(b2) reveal that AutoTimes [18] tends
+to produce more aggressive predictions with higher oscillation amplitudes,
+while Fig. 5(c1) and Fig. 5(c2) illustrate Time-LLM’s [4] conservative predic-
+tion strategy characterized by noticeable lagging effects. In this evaluation,
+SMETimes exhibits improved prediction accuracy compared to contempo-
+rary LLM-based time series forecasting models, including AutoTimes [18] and
+Time-LLM [4].
+5 Limitation
+Our model suffers from the degradation of accuracy in longer-horizon forecast-
+ing due to the capacity constraints of Small Language Models (SLMs). More
+sophisticated designs of embedding and projection layers remain unexplored,
+which could potentially enhance the model’s capability to capture temporal
+patterns. Additionally, training efficiency could be further optimized using
+advanced techniques such as dynamic batching or mixed-precision training,
+as the current computational overhead still poses challenges for resource-
+constrained scenarios. These promising directions constitute our immediate
+research agenda to improve both performance and practicality.
+
+
+16
+Enhancing Time Series Forecasting with Lightweight LLMs
+(a1): SMETimes(ours)
+(b1): AutoTimes [18]
+(c1): Time-LLM [4]
+(a2): SMETimes(ours)
+(b2): AutoTimes [18]
+(c2): Time-LLM [4]
+Fig. 5: Long-term forecasting cases from ETTh1 [11] by different models under the
+input-672-predict-96 settings. Blue lines are the ground truths and orange lines are
+the model predictions.
+6 Acknowledge
+This work was supported by the Natural Science Foundation of Guangdong
+Province (No. 2023A1515010673), in part by the Shenzhen Science and Tech-
+nology Innovation Bureau key project (No. JSGG20220831110400001, No.
+CJGJZD20230724093303007, KJZD20240903101259001), in part by Shenzhen
+Medical Research Fund (No. D2404001), in part by Shenzhen Engineering Lab-
+oratory for Diagnosis & Treatment Key Technologies of Interventional Surgical
+Robots (XMHT20220104009), and the Key Laboratory of Biomedical Imaging
+Science and System, CAS, for the Research platform support.
+7 Conclusion
+In this work, we proposed the SMETimes, which establishes SLMs as efficient
+time series forecasters through three innovations. The statistically enhanced
+prompt structure bridges numerical temporal signals, the adaptive fusion
+embedding structure aligns continuous patterns, and the dynamic mix-of-
+experts structure leverages the SLM efficiency. Our 3B model outperforms the
+7B LLMs by 6.9% MSE with 3.8× faster inference, achieving SOTA on five
+benchmarks. Ablations validate critical components (15.7% error reduction
+from adaptive fusion embedding structure), while maintaining stability across
+configurations. These prospective avenues constitute our primary research
+agenda that aims to enhance both the performance and practical applicability
+of the model.
+
+
+Enhancing Time Series Forecasting with Lightweight LLMs
+17
+References
+[1] S. H. Schneider and R. E. Dickinson, “Climate modeling,” Reviews of
+Geophysics, vol. 12, no. 3, pp. 447–493, 1974.
+[2] G. E. P. Box and G. M. Jenkins, “Time series analysis: Forecasting and
+control,” 1994.
+[3] Y. Liu, T. Hu, H. Zhang, H. Wu, S. Wang, L. Ma, and M. Long, “itrans-
+former: Inverted transformers are effective for time series forecasting,”
+arXiv preprint arXiv:2310.06625, 2023.
+[4] M. Jin, S. Wang, L. Ma, Z. Chu, J. Y. Zhang, X. Shi, P.-Y. Chen,
+Y. Liang, Y.-F. Li, S. Pan et al., “Time-llm: Time series forecasting by
+reprogramming large language models,” arXiv preprint arXiv:2310.01728,
+2023.
+[5] H. Touvron, L. Martin, K. Stone, P. Albert, A. Almahairi, Y. Babaei,
+N. Bashlykov, S. Batra, P. Bhargava, S. Bhosale et al., “Llama
+2: Open foundation and fine-tuned chat models,” arXiv preprint
+arXiv:2307.09288, 2023.
+[6] G. Woo, C. Liu, A. Kumar, C. Xiong, S. Savarese, and D. Sahoo, “Unified
+training of universal time series forecasting transformers,” in International
+Conference on Machine Learning.
+PMLR, 2024, pp. 53 140–53 164.
+[7] N. Gruver, M. Finzi, S. Qiu, and A. G. Wilson, “Large language models
+are zero-shot time series forecasters,” Advances in Neural Information
+Processing Systems, vol. 36, pp. 19 622–19 635, 2023.
+[8] Y. Liu, C. Li, J. Wang, and M. Long, “Koopa: Learning non-stationary
+time series dynamics with koopman predictors,” Advances in neural
+information processing systems, vol. 36, pp. 12 271–12 290, 2023.
+[9] S. Hochreiter and J. Schmidhuber, “Long short-term memory,” Neural
+computation, vol. 9, no. 8, pp. 1735–1780, 1997.
+[10] A. Vaswani, N. Shazeer, N. Parmar, J. Uszkoreit, L. Jones, A. N. Gomez,
+ L. Kaiser, and I. Polosukhin, “Attention is all you need,” Advances in
+neural information processing systems, vol. 30, 2017.
+[11] H. Zhou, S. Zhang, J. Peng, S. Zhang, J. Li, H. Xiong, and W. Zhang,
+“Informer: Beyond efficient transformer for long sequence time-series fore-
+casting,” in Proceedings of the AAAI conference on artificial intelligence,
+vol. 35, no. 12, 2021, pp. 11 106–11 115.
+[12] H. Wu, J. Xu, J. Wang, and M. Long, “Autoformer: Decomposition trans-
+formers with auto-correlation for long-term series forecasting,” Advances
+
+
+18
+Enhancing Time Series Forecasting with Lightweight LLMs
+in neural information processing systems, vol. 34, pp. 22 419–22 430, 2021.
+[13] K. Wen, Y. Li, B. Liu, and A. Risteski, “Transformers are uninter-
+pretable with myopic methods: a case study with bounded dyck gram-
+mars,” Advances in Neural Information Processing Systems, vol. 36, pp.
+38 723–38 766, 2023.
+[14] H. Xue and F. D. Salim, “Promptcast: A new prompt-based learning
+paradigm for time series forecasting,” IEEE Transactions on Knowledge
+and Data Engineering, vol. 36, no. 11, pp. 6851–6864, 2023.
+[15] D. Cao, F. Jia, S. O. Arik, T. Pfister, Y. Zheng, W. Ye, and Y. Liu,
+“Tempo: Prompt-based generative pre-trained transformer for time series
+forecasting,” arXiv preprint arXiv:2310.04948, 2023.
+[16] C.-H. H. Yang, Y.-Y. Tsai, and P.-Y. Chen, “Voice2series: Reprogram-
+ming acoustic models for time series classification,” in International
+conference on machine learning.
+PMLR, 2021, pp. 11 808–11 819.
+[17] C. Chen, C. Wang, B. Liu, C. He, L. Cong, and S. Wan, “Edge
+intelligence empowered vehicle detection and image segmentation for
+autonomous vehicles,” IEEE Transactions on Intelligent Transportation
+Systems, vol. 24, no. 11, pp. 13 023–13 034, 2023.
+[18] Y. Liu, G. Qin, X. Huang, J. Wang, and M. Long, “Autotimes: Autoregres-
+sive time series forecasters via large language models,” Advances in Neural
+Information Processing Systems, vol. 37, pp. 122 154–122 184, 2025.
+[19] X. Liu, J. Hu, Y. Li, S. Diao, Y. Liang, B. Hooi, and R. Zimmermann,
+“Unitime: A language-empowered unified model for cross-domain time
+series forecasting,” in Proceedings of the ACM Web Conference 2024,
+2024, pp. 4095–4106.
+[20] T. Zhou, P. Niu, L. Sun, R. Jin et al., “One fits all: Power general
+time series analysis by pretrained lm,” Advances in neural information
+processing systems, vol. 36, pp. 43 322–43 355, 2023.
+[21] Y. Zhou, Z. Chu, Y. Ruan, G. Jin, Y. Huang, and S. Li, “ptse: a
+multi-model ensemble method for probabilistic time series forecasting,”
+in Proceedings of the Thirty-Second International Joint Conference on
+Artificial Intelligence, 2023, pp. 4684–4692.
+[22] S. Bai, J. Z. Kolter, and V. Koltun, “An empirical evaluation of generic
+convolutional and recurrent networks for sequence modeling,” arXiv
+preprint arXiv:1803.01271, 2018.
+
+
+Enhancing Time Series Forecasting with Lightweight LLMs
+19
+[23] N. Li, L. Chen, and M. A. Dahleh, “Demand response using linear supply
+function bidding,” IEEE Transactions on Smart Grid, vol. 6, no. 4, pp.
+1827–1838, 2015.
+[24] R. H. Shumway, D. S. Stoffer, R. H. Shumway, and D. S. Stoffer, “Arima
+models,” Time series analysis and its applications: with R examples, pp.
+75–163, 2017.
+[25] Z. Chen, Y.-L. Zhao, X.-Y. Pan, Z.-Y. Dong, B. Gao, and Z.-W. Zhong,
+“An overview of prophet,” in Algorithms and Architectures for Parallel
+Processing: 9th International Conference, ICA3PP 2009, Taipei, Taiwan,
+June 8-11, 2009. Proceedings 9.
+Springer, 2009, pp. 396–407.
+[26] A. K. Dubey, A. Kumar, V. Garc´ıa-D´ıaz, A. K. Sharma, and K. Kanhaiya,
+“Study and analysis of sarima and lstm in forecasting time series data,”
+Sustainable Energy Technologies and Assessments, vol. 47, p. 101474,
+2021.
+[27] P. R. Winters, “Forecasting sales by exponentially weighted moving
+averages,” Management science, vol. 6, no. 3, pp. 324–342, 1960.
+[28] L. Floridi and M. Chiriatti, “Gpt-3: Its nature, scope, limits, and
+consequences,” Minds and Machines, vol. 30, pp. 681–694, 2020.
+[29] G. Lai, W.-C. Chang, Y. Yang, and H. Liu, “Modeling long-and short-term
+temporal patterns with deep neural networks,” in The 41st interna-
+tional ACM SIGIR conference on research & development in information
+retrieval, 2018, pp. 95–104.
+[30] A. Petrucci, G. Barone, A. Buonomano, and A. Athienitis, “Modelling
+of a multi-stage energy management control routine for energy demand
+forecasting, flexibility, and optimization of smart communities using a
+recurrent neural network,” Energy Conversion and Management, vol. 268,
+p. 115995, 2022.
+[31] A. Zeng, M. Chen, L. Zhang, and Q. Xu, “Are transformers effective
+for time series forecasting?” in Proceedings of the AAAI conference on
+artificial intelligence, vol. 37, no. 9, 2023, pp. 11 121–11 128.
+[32] Y. Nie, N. H. Nguyen, P. Sinthong, and J. Kalagnanam, “A time series is
+worth 64 words: Long-term forecasting with transformers,” arXiv preprint
+arXiv:2211.14730, 2022.
+[33] H. Wu, T. Hu, Y. Liu, H. Zhou, J. Wang, and M. Long, “Timesnet:
+Temporal 2d-variation modeling for general time series analysis,” arXiv
+preprint arXiv:2210.02186, 2022.
+
+
+20
+Enhancing Time Series Forecasting with Lightweight LLMs
+[34] D. P. Kingma and J. Ba, “Adam: A method for stochastic optimization,”
+arXiv preprint arXiv:1412.6980, 2014.
+[35] A. Dubey, A. Jauhri, A. Pandey, A. Kadian, A. Al-Dahle, A. Letman,
+A. Mathur, A. Schelten, A. Yang, A. Fan et al., “The llama 3 herd of
+models,” arXiv preprint arXiv:2407.21783, 2024.
+[36] S. Zhang, S. Roller, N. Goyal, M. Artetxe, M. Chen, S. Chen, C. Dewan,
+M. Diab, X. Li, X. V. Lin et al., “Opt: Open pre-trained transformer
+language models,” arXiv preprint arXiv:2205.01068, 2022.
+[37] A. Radford, J. Wu, R. Child, D. Luan, D. Amodei, I. Sutskever et al.,
+“Language models are unsupervised multitask learners,” OpenAI blog,
+vol. 1, no. 8, p. 9, 2019.
+[38] A. Paszke, S. Gross, F. Massa, A. Lerer, J. Bradbury, G. Chanan,
+T. Killeen, Z. Lin, N. Gimelshein, L. Antiga et al., “Pytorch: An imper-
+ative style, high-performance deep learning library,” Advances in neural
+information processing systems, vol. 32, 2019.
+[39] D. Hendrycks and K. Gimpel, “Gaussian error linear units (gelus),” arXiv
+preprint arXiv:1606.08415, 2016.
+[40] D. Cao and S. Zhang, “Ad-autoformer: decomposition transformers with
+attention distilling for long sequence time-series forecasting,” The Journal
+of Supercomputing, vol. 80, no. 14, pp. 21 128–21 148, 2024.
+[41] A. A. Alioghli and F. Yıldırım Okay, “Enhancing multivariate time-series
+anomaly detection with positional encoding mechanisms in transformers,”
+The Journal of Supercomputing, vol. 81, no. 1, pp. 1–27, 2025.
+[42] L. Zhao, Z. Li, Y. Ma, and L. Qu, “A novel cryptocurrency price
+time series hybrid prediction model via machine learning with mat-
+lab/simulink,” The Journal of Supercomputing, vol. 79, no. 14, pp.
+15 358–15 389, 2023.

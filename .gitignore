@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# 预训练 LLM 权重（11G+，由 scripts/download_model.py 或 ModelScope 重新下载）
+models/llm/
+
+# 数据：CSV 可提交，时间嵌入 .pt 由预处理脚本生成（与所用 LLM hidden size 绑定）
+data/**/*.pt
+
+# 训练产物（检查点、预测图、指标）
+results/
+checkpoints/
+test_results/
+result_long_term_forecast.txt
+outputs/
+logs/
+
+# 3B 实验隔离数据目录（硬链接 + 生成的 .pt）与 data 目录联接（脚本生成）
+dataset_3b/
+experiments/3b/data/
+
+# 归档与 IDE
+*.zip
+*.rar
+.idea/
+.vscode/

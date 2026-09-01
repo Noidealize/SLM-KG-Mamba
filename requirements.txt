@@ -1,0 +1,9 @@
+torch
+transformers
+huggingface_hub
+safetensors
+numpy
+pandas
+scikit-learn
+matplotlib
+tqdm

@@ -1,0 +1,165 @@
+SMETimes Llama-3.2-3B 完整操作说明（Windows / RTX 5070 Ti）
+============================================================
+
+一、目录区分
+
+1B 原有内容（不移动、不覆盖）：
+  models\llm\llama-3.2-1b-instruct
+  data\...\*.pt
+  results\checkpoints
+  results\test_results
+  results\result_long_term_forecast.txt
+
+3B 内容：
+  底座模型：models\llm\llama-3.2-3b-instruct
+  时间嵌入：experiments\3b\dataset_3b\...\*.pt
+  检查点：experiments\3b\outputs\checkpoints
+  预测图：experiments\3b\results\test_results
+  指标：experiments\3b\results\result_long_term_forecast.txt
+  日志：experiments\3b\logs
+
+二、打开 PowerShell 并进入工程
+
+  Set-Location "D:\VSCODEPROJECT\llmprediction"
+
+三、确认环境
+
+  & "D:\ANACONDA\envs\pytorch\python.exe" -c "import torch, transformers; print(torch.__version__); print(transformers.__version__); print(torch.cuda.get_device_name(0)); print(round(torch.cuda.get_device_properties(0).total_memory/2**30, 2), 'GiB')"
+
+当前已核对：torch 2.12.1+cu132、transformers 5.15.0、RTX 5070 Ti、15.92 GiB。
+
+开跑前先验证 Hybrid-Adam 补丁（纯 CPU，秒级）：
+
+  Set-Location "D:\VSCODEPROJECT\llmprediction\experiments\3b"
+  & "D:\ANACONDA\envs\pytorch\python.exe" .\test_hybrid_step.py
+
+应看到 ALL PASSED（Hybrid-Adam 与原生 Adam/AdamW 最大偏差 ~6e-8）。
+
+四、下载 3B 模型（当前目录内只有许可证和 README，权重尚未下载）
+
+Llama 3.2 是受限模型。先在 Hugging Face 网页接受 Meta 许可，并给本机登录：
+
+  & "D:\ANACONDA\envs\pytorch\Scripts\hf.exe" auth login
+
+然后下载：
+
+  Set-Location "D:\VSCODEPROJECT\llmprediction"
+  & "D:\ANACONDA\envs\pytorch\python.exe" .\scripts\download_model.py --repo_id meta-llama/Llama-3.2-3B-Instruct --local_dir .\models\llm\llama-3.2-3b-instruct
+
+下载完成后必须看到 config.json、tokenizer.json 和 model*.safetensors。验证：
+
+  Get-ChildItem .\models\llm\llama-3.2-3b-instruct
+
+五、建立独立 3B 数据目录
+
+  Set-Location "D:\VSCODEPROJECT\llmprediction"
+  .\experiments\3b\prepare_3b_data.ps1
+
+脚本通过硬链接共享 CSV，不重复占用数据空间；3B 的 .pt 会写入独立目录。
+
+六、建议先只跑 ETTh1 预处理
+
+  Set-Location "D:\VSCODEPROJECT\llmprediction\experiments\3b"
+  $env:PYTHONUNBUFFERED='1'
+  $env:PYTHONFAULTHANDLER='1'
+  & "D:\ANACONDA\envs\pytorch\python.exe" -u .\preprocess_smetimes.py --dataset ETTh1 --batch_size 8 --num_workers 0 --device auto --llm_ckp_dir "D:\VSCODEPROJECT\llmprediction\models\llm\llama-3.2-3b-instruct" --local_files_only 2>&1 | Tee-Object .\logs\preprocess_ETTh1_3b.log
+
+成功标志：最后显示 result.shape，且生成：
+  experiments\3b\dataset_3b\ETT-small\ETTh1.pt
+
+七、只训练 ETTh1（建议先完成这个，再扩展全部数据集）
+
+开跑前：
+  1. 关闭占用显存的 GPU 后台应用（壁纸引擎、ChatGPT 客户端、浏览器等）——
+     3B fp32 模型占 12GB，桌面应用再占 ~2.6GB 会挤满 16GB；
+  2. nvidia-smi 确认空闲显存 >14GB。
+运行中另开窗口执行 nvidia-smi -l 5：GPU 利用率应较高，CPU 不应满载。
+
+  Set-Location "D:\VSCODEPROJECT\llmprediction\experiments\3b"
+  $env:PYTHONUNBUFFERED='1'
+  $env:PYTHONFAULTHANDLER='1'
+  & "D:\ANACONDA\envs\pytorch\python.exe" -u .\train_smetimes.py --task_name long_term_forecast --is_training 1 --model SMETimes_Llama --data ETTh1 --root_path .\dataset_3b\ETT-small\ --data_path ETTh1.csv --model_id ETTh1_672_96_3b --seq_len 672 --label_len 576 --token_len 96 --test_seq_len 672 --test_label_len 576 --test_pred_len 96 --batch_size 8 --learning_rate 0.001 --mlp_hidden_layers 0 --train_epochs 10 --gpu 0 --device auto --llm_ckp_dir "D:\VSCODEPROJECT\llmprediction\models\llm\llama-3.2-3b-instruct" --num_workers 0 --cosine --tmax 10 --mix_embeds --checkpoints .\outputs\checkpoints\ --local_files_only --des llama3_2_3b --no_use_amp 2>&1 | Tee-Object .\logs\train_ETTh1_3b.log
+
+预期速度 ~0.11-0.14 s/iter，10 epochs 约 2.5-3 小时。日志中偶发的
+[Hybrid-Adam] WARNING / [NaN-guard] 打印属正常防护动作；频繁出现才需停训排查。
+例外：[integrity] INTEGRITY FAILURE 不是防护动作，出现即训练已自动中止（见九.3）。
+
+成功标志：
+  0. 日志开头出现 patched -> hybrid + CPU referee；
+  1. 模型加载后出现 [integrity] 冻结权重参考已记录；
+  2. 每 2000 步与每个 epoch 验证前出现 [integrity] frozen-weights hash OK；
+  3. 日志出现 testing；
+  4. outputs\checkpoints 下出现 checkpoint.pth；
+  5. results\result_long_term_forecast.txt 出现 mse 和 mae；
+  6. results\test_results 下出现预测图。
+
+八、ETTh1 成功后再运行全部五个数据集
+
+两个脚本内部已设置 PYTHONUNBUFFERED/FAULTHANDLER 并以 -u 调用 python，
+直接运行即可：
+
+  Set-Location "D:\VSCODEPROJECT\llmprediction\experiments\3b"
+  .\preprocess_all_3b.ps1 2>&1 | Tee-Object .\logs\preprocess_all_3b.log
+  .\train_all_3b.ps1 2>&1 | Tee-Object .\logs\train_all_3b.log
+
+注意：如果已完成 ETTh1，全量脚本会重新处理和训练 ETTh1。若不希望重复，可临时从两个脚本的列表中删掉 ETTh1 那一项。
+
+九、显存和异常处理
+
+1. 必须保留 --no_use_amp；本机 3B fp16 前向曾产生 NaN。
+2. 默认 batch_size=8。若 CUDA out of memory 或整机冻死，改为 4；不要先提高到 16/32。
+3. train_smetimes.py 已内置四套本机实测防护（详见文件头注释）：
+   - eager attention（patch_eager）：修 RTX 5070 Ti 上 sdpa 内核的非确定性 NaN；
+   - 前向 NaN 检测重试（NaN-guard）：坏样本替换后重跑；
+   - Hybrid-Adam + CPU 裁判：≥4MB 参数（experts.0.weight）走 CPU 权威路径
+     （GPU 大张量 elementwise 内核会以 ~5% 概率产出坏值）；小参数 GPU 原地
+     更新，但每步由 CPU 用同一份清洗后梯度复算比对（阈值 1e-3），不一致
+     即 GPU 静默损坏、用 CPU 权威值写回修复；同步点 ~10/步（全量 CPU-Adam
+     为 40+，本机冻机原因）；CPU 侧限 2 线程；
+   - 冻结权重完整性校验：模型构造时记录冻结 Llama 权重的参考哈希（fp64），
+     每 2000 步与每次验证/测试前重算比对，不一致重算一次仍坏则立即中止
+     训练（日志出现 INTEGRITY FAILURE = 权重被静默改坏，该次检查点与
+     result 文件作废，需重新训练）。
+4. 所有 python 命令必须带 -u 且先设置 $env:PYTHONUNBUFFERED='1'：
+   stdout 走 PowerShell 管道时是 8KB 块缓冲，进程异常退出会丢失缓冲内的
+   全部 print（日志看起来"停在某处"，实际进程已跑远）。同时设置
+   $env:PYTHONFAULTHANDLER='1'，原生崩溃会打印 Python 栈帧到日志。
+5. 若日志反复出现 guard exhausted 或训练损失为 NaN，应停止该次训练并保留
+   日志，不要把该检查点作为有效结果。
+6. 冻机预案（2026-08-30 曾在 epoch 3 冻死整机）：根因是全量 CPU-Adam 打满
+   CPU + 后台应用挤占显存，已通过 Hybrid-Adam + 限线程修复；若再次冻机，
+   重启后按顺序排查：nvidia-smi 确认显存 → batch_size 8 改 4 → 保留日志。
+
+十、运行记录
+
+2026-08-30：
+  1. 首次训练无输出地停止：进程实际进入了训练循环，但 stdout 管道块缓冲
+     吞掉了所有 print，进程死亡时缓冲丢失，日志停在"Loading weights"。
+     修复：全部命令加 -u + PYTHONUNBUFFERED，此后日志实时落盘。
+  2. 带诊断重跑后训练正常（0.137-0.142 s/iter），但到 epoch 3 iter 6000+
+     整机冻死：全量 CPU-Adam 每步 40+ 次 GPU 同步 + 多线程 CPU 运算打满
+     全部核心，GPU 利用率低。修复：Hybrid-Adam（大参数 CPU 权威路径不变，
+     小参数 GPU 更新）+ OMP/MKL 限 2 线程；test_hybrid_step.py 验证通过。
+  3. Hybrid-Adam 下首次完整训练（5 epochs，早停）跑完但结果作废：epoch 3
+     最后 89 个 batch 内 loss 从 0.65 骤升 2 万+（train 204），epoch 4-5 每步
+     ~5/8 参数梯度爆炸被跳过、模型冻结在 train ~220K。全程零 NaN、零读回
+     坏值告警——崩溃由"有限坏值"静默写坏权重导致（isnan 拦不住的已知
+     故障形态），当时的盲区是小参数无权威校验 + 冻结权重从未校验。
+     修复：小参数 CPU 裁判（每步复算比对+权威值修复）+ 冻结权重哈希校验
+     （每 2000 步与验证前，坏则中止）；test_hybrid_step.py 全部用例通过
+     （含 NaN 梯度裁判连续同步、坏值修复、中止路径的回归测试）。
+     该次报告的 mse 0.3976 / mae 0.4254 来自崩溃前的 epoch-2 检查点，只代表
+     2 轮训练水平，不可作为 3B 最终成绩。
+
+十一、与 1B 公平比较
+
+先比较相同任务 ETTh1、seq_len=672、pred_len=96：
+  1B：MSE 0.3701957，MAE 0.4016435
+  3B：读取 experiments\3b\results\result_long_term_forecast.txt
+
+注意：当前 result 文件是 2026-08-30 那次崩毁运行的 epoch-2 检查点成绩
+（训练在 epoch 3 崩毁，早停保存的 epoch-2 最优检查点），不是 10 轮协议的
+最终结果；重跑成功（日志含全部 [integrity] frozen-weights hash OK 标记、
+且无 INTEGRITY FAILURE）后，以新数值为准再做比较。
+
+只有当数据切分、预测长度、训练轮数和评测代码一致时，1B/3B 指标才可直接比较。

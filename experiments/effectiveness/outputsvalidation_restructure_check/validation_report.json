@@ -1,0 +1,25 @@
+{
+  "status": "valid",
+  "dataset": "ETTh1",
+  "csv_path": "D:\\VSCODEPROJECT\\llmprediction\\data\\ETT-small\\ETTh1.csv",
+  "csv_rows": 17420,
+  "feature_count": 7,
+  "data_sha256": "f18de3ad269cef59bb07b5438d79bb3042d3be49bdeecf01c1cd6d29695ee066",
+  "embedding_path": "D:\\VSCODEPROJECT\\llmprediction\\data\\ETT-small\\ETTh1.pt",
+  "embedding_sha256": "87edc42461ee99ecef53694539c4093eb0a8efe6dc77b6e15d90438100f2a6f0",
+  "embedding_shape": [
+    17420,
+    2048
+  ],
+  "embedding_dtype": "torch.float16",
+  "embedding_finite": true,
+  "llm_path": "D:\\VSCODEPROJECT\\llmprediction\\models\\llm\\llama-3.2-1b-instruct",
+  "llm_hidden_size": 2048,
+  "llm_config_sha256": "2febf68cea25bf4611be02b7536f2488a5ba523bb1134986e3610152abe74fdb",
+  "llm_weight_sha256": {
+    "model.safetensors": "1ff795ff6a07e6a68085d206fb84417da2f083f68391c2843cd2b8ac6df8538f"
+  },
+  "llm_weight_index_sha256": {},
+  "expected_test_samples": 19495,
+  "locked_horizon": "672->96"
+}

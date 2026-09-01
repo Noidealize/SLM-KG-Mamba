@@ -1,0 +1,17 @@
+[
+  {"sensor_column": "s2", "text": "T24: low-pressure compressor outlet total temperature. Monitors the LPC and reflects compression state."},
+  {"sensor_column": "s3", "text": "T30: high-pressure compressor outlet total temperature. Monitors the HPC outlet thermal state."},
+  {"sensor_column": "s4", "text": "T50: low-pressure turbine outlet total temperature. Monitors the LPT exhaust thermal state."},
+  {"sensor_column": "s7", "text": "P30: high-pressure compressor outlet total pressure. Monitors HPC compression performance."},
+  {"sensor_column": "s8", "text": "Nf: physical fan rotational speed. Associated with the low-pressure shaft and fan rotor."},
+  {"sensor_column": "s9", "text": "Nc: physical core rotational speed. Associated with the high-pressure core rotor."},
+  {"sensor_column": "s11", "text": "Ps30: high-pressure compressor outlet static pressure. Describes HPC outlet pressure state."},
+  {"sensor_column": "s12", "text": "Phi: fuel-flow to Ps30 ratio. Relates combustor fuel scheduling to compressor outlet pressure."},
+  {"sensor_column": "s13", "text": "NRf: corrected fan speed. Describes fan rotor speed adjusted for operating conditions."},
+  {"sensor_column": "s14", "text": "NRc: corrected core speed. Describes core rotor speed adjusted for operating conditions."},
+  {"sensor_column": "s15", "text": "BPR: bypass ratio. Describes flow division between bypass duct and engine core."},
+  {"sensor_column": "s17", "text": "htBleed: bleed enthalpy associated with high-pressure compressor bleed flow."},
+  {"sensor_column": "s20", "text": "W21: high-pressure turbine coolant bleed flow. Associated with HPT thermal management."},
+  {"sensor_column": "s21", "text": "W32: low-pressure turbine coolant bleed flow. Associated with LPT thermal management."}
+]
+
